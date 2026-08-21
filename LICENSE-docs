@@ -1,0 +1,66 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Copyright (c) 2026 local-ai-cost-cutting contributors
+
+This license applies to the documentation in this repository:
+
+    docs/           all documents
+    README.md
+    README.ko.md
+    patches/README.md
+    reference/README.md
+    bench/README.md
+
+The code under patches/, reference/, and bench/ is licensed separately under
+the MIT License. See LICENSE.
+
+
+You are free to
+---------------
+
+  Share    — copy and redistribute the material in any medium or format
+  Adapt    — remix, transform, and build upon the material
+             for any purpose, even commercially.
+
+The licensor cannot revoke these freedoms as long as you follow the license
+terms.
+
+
+Under the following terms
+-------------------------
+
+  Attribution — You must give appropriate credit, provide a link to the
+  license, and indicate if changes were made. You may do so in any reasonable
+  manner, but not in any way that suggests the licensor endorses you or your
+  use.
+
+  No additional restrictions — You may not apply legal terms or technological
+  measures that legally restrict others from doing anything the license
+  permits.
+
+
+Notices
+-------
+
+You do not have to comply with the license for elements of the material in the
+public domain or where your use is permitted by an applicable exception or
+limitation.
+
+No warranties are given. The license may not give you all of the permissions
+necessary for your intended use. For example, other rights such as publicity,
+privacy, or moral rights may limit how you use the material.
+
+
+Measurement data
+----------------
+
+The benchmark figures in docs/ were measured on a single specific machine and
+are provided as-is with no warranty of reproducibility on other hardware. The
+measurement conditions and known limitations are documented in
+docs/ko/98-benchmark.md.
+
+
+Full license text
+-----------------
+
+https://creativecommons.org/licenses/by/4.0/legalcode
