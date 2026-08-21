@@ -163,7 +163,7 @@ In this project, **the mix of low-cost cards beat the single high-cost card on b
 
 **One prerequisite had to hold for this result.** A 200 USD 16GB card was not a candidate at all because the model would not fit; only after [module separation](02-encoder-separation.md) lowered the minimum VRAM requirement from 19.1GB to 13.6GB did it become an option.
 
-**There is a definite order between choosing cards and partitioning work - you can only choose after you have partitioned.** That said, the procedure does not finish in a single pass, and **there are good reasons to run the whole loop several times** (Section 6).
+**There is a definite order between choosing cards and partitioning work - you can only choose after you have partitioned.** That said, the procedure does not finish in a single pass, and **there are good reasons to run the whole loop several times** ([Section 6](#6-full-procedure-checklist)).
 
 ---
 

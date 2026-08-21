@@ -95,9 +95,9 @@ Every measurement above is unified on PuLID enabled. The per-image time quoted i
 
 > **The 230 USD for condition 2** is 200 USD of GPU plus 30 USD of RAM. Putting the separated encoder in RAM requires that much physical memory, and an 8GB DDR4 module is about 30 USD. **RAM is a cost too and belongs in the calculation.**
 
-**Condition 5 is not a measurement.** Three V100 16GB cards were not available, so it is a value back-calculated from conditions 3 and 4 (Section 4).
+**Condition 5 is not a measurement.** Three V100 16GB cards were not available, so it is a value back-calculated from conditions 3 and 4 ([Section 4](#4-derived-calculations)).
 
-**Condition 7 is a diagnostic, not a purchase option.** Its worker card matches condition 1 and its operation matches condition 3, which separates whether condition 1's per-image latency comes from the card or from the structure (Section 9).
+**Condition 7 is a diagnostic, not a purchase option.** Its worker card matches condition 1 and its operation matches condition 3, which separates whether condition 1's per-image latency comes from the card or from the structure ([Section 9](#9-disconfirmation---why-the-32gb-card-was-slower)).
 
 ### Price Basis
 
@@ -221,7 +221,7 @@ t5 = 48.1 + 2 x 28.61 = 105.4s
 **This value is an optimistic upper bound.** In practice it is likely to be slower, for two reasons.
 
 - **Disk I/O contention at startup** - three processes reading a 12GB model at once increases S. In condition 6, going to two workers pushed the first image from 49.9s to 88.0s, a 76% increase
-- **Thermal interaction between cards** - cards that were idle during condition 4 heat up together in condition 5 (Section 9)
+- **Thermal interaction between cards** - cards that were idle during condition 4 heat up together in condition 5 ([Section 9](#9-disconfirmation---why-the-32gb-card-was-slower))
 
 ---
 
@@ -308,7 +308,7 @@ This is direct evidence that the core premise of [the encoder separation design]
 
 ### A Corollary - Encoding Time Is Perfectly Linear in Chunk Count
 
-A dedicated measurement (7-3) confirmed linearity on both sides.
+A dedicated measurement ([7-3](#7-3-why-25x-faster-than-cpu---arithmetic-intensity-and-ridge-point)) confirmed linearity on both sides.
 
 | | 256 tokens | 512 tokens | Ratio |
 |---|---|---|---|
@@ -409,7 +409,7 @@ Because processing is chunked, **intensity stays at 498 as token count grows.** 
 |---|---|---|---|
 | **INT8 DP4A** | 22 TOPS | **68.8** | the path q8_0 takes |
 | FP32 | 6.1 TFLOPS | 19.1 | |
-| FP16 | 0.095 TFLOPS | 0.30 | **crippled to 1/64 - but this path was never selected (Section 12)** |
+| FP16 | 0.095 TFLOPS | 0.30 | **crippled to 1/64 - but this path was never selected ([Section 12](#12-sm-scaling-and-kernel-path-measurements))** |
 
 ```
 arithmetic intensity 498  vs  ridge point 68.8   ->  7.2x   ->  unambiguously compute-bound
@@ -425,7 +425,7 @@ The P104's 320 GB/s is **about a third of a V100's.** Had this been memory-bound
 > No.1 the work is one where weak bandwidth is not the bottleneck, and No.2 that card's INT8 compute is intact.
 > **Break either one and it does not hold.**
 
-**What made this card usable was not the card selection but q8_0 quantization.** The reason, though, was fit rather than speed - T5-XXL at fp16 is 9.79GB and simply does not go on an 8GB card. On speed, q8_0 is 2.17x f16, a far narrower margin than the specification suggested (Section 12) -> [No.1 4-1](01-role-assignment.md#4-1-there-are-two-directions-of-attack)
+**What made this card usable was not the card selection but q8_0 quantization.** The reason, though, was fit rather than speed - T5-XXL at fp16 is 9.79GB and simply does not go on an 8GB card. On speed, q8_0 is 2.17x f16, a far narrower margin than the specification suggested ([Section 12](#12-sm-scaling-and-kernel-path-measurements)) -> [No.1 4-1](01-role-assignment.md#4-1-there-are-two-directions-of-attack)
 
 #### Cross-Verification
 
@@ -500,7 +500,7 @@ Observations from before encoder separation was introduced, when adding a worker
 
 The third item is easy to overlook. **It is not only the CPU that contends - storage does too.** Two processes reading the same weight file at once made load time 2.9x. This server has NVMe, hence that figure; **on a SATA SSD or HDD with weaker random 4K read the gap would be larger.**
 
-The same phenomenon reproduced under controlled conditions - in condition 6, going to two workers pushed **the first image from 49.9s to 88.0s, a 76% increase** (Section 6). Anyone planning a configuration with many workers must account for it.
+The same phenomenon reproduced under controlled conditions - in condition 6, going to two workers pushed **the first image from 49.9s to 88.0s, a 76% increase** ([Section 6](#6-interpretation---axis-b-throughput-increase-at-equal-cost)). Anyone planning a configuration with many workers must account for it.
 
 ---
 
@@ -681,12 +681,12 @@ Recorded honestly. The following cannot be answered by this experiment.
 
 | Item | Reason | Effect |
 |---|---|---|
-| **Condition 5 (3 workers)** | three V100 16GB cards were not available | a derived value and an optimistic upper bound (4-2) |
+| **Condition 5 (3 workers)** | three V100 16GB cards were not available | a derived value and an optimistic upper bound ([4-2](#4-2-deriving-condition-5)) |
 | **Human evaluation time T** | varies widely with task, skill, and fatigue | [No.3](03-pipeline-throughput.md)'s time model is a structural comparison with T as an unknown |
 | **Warm-state performance** | no separate measurement was made | estimable only by subtracting load and ramp-up phases from the cold logs |
 | **Concurrent multi-user requests** | measured for a single user | encoder serialization could become the bottleneck -> [No.4 Section 3](04-orchestration.md#3-the-order-in-which-bottlenecks-move-as-n-grows) |
 | **Other resolutions and step counts** | fixed at 768x768 / 15 steps | higher resolution raises latent patch count, so per-image time grows nonlinearly |
-| **An environment with even cooling** | this server's 32GB card was thermally constrained | conditions 1, 6, and 7 have room to improve with better cooling (Section 9) |
+| **An environment with even cooling** | this server's 32GB card was thermally constrained | conditions 1, 6, and 7 have room to improve with better cooling ([Section 9](#9-disconfirmation---why-the-32gb-card-was-slower)) |
 | **Direct comparison against an A100 or other higher-tier card** | no published data measured with the same engine | see below |
 
 ### 11-1. Why No Comparison Against Higher-Tier Cards
@@ -807,7 +807,7 @@ A kernel benchmark measures only a single GEMM shape. It was confirmed with **to
 | q8_0 (5.20 GB) | 0.199s | **2.98s** |
 | **fp16 (9.79 GB)** | **0.169s** | 8.46s |
 
-**On compute, fp16 is 1.18x faster.** Removing the 0.117s fixed cost (12-1) leaves 0.082s against 0.052s for the compute portion alone, **a factor of 1.58** - a wider gap than the kernel benchmark's 1.24x.
+**On compute, fp16 is 1.18x faster.** Removing the 0.117s fixed cost ([12-1](#12-1-sm-scaling---is-performance-linear-in-core-count)) leaves 0.082s against 0.052s for the compute portion alone, **a factor of 1.58** - a wider gap than the kernel benchmark's 1.24x.
 
 **The reason reading half the weights does not pay off in compute is that encoding is compute-bound** (arithmetic intensity 498). What it does buy is **startup: q8_0 is 2.8x faster** - the difference of having to read 9.79GB shows up right there.
 

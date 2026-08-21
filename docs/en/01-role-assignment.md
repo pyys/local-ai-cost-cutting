@@ -103,8 +103,8 @@ Once the [workload analysis](00-method.md) exists, choose the cards. **In descen
 | Rank | Axis | Reason |
 |---|---|---|
 | **0** | **Budget** | if you cannot buy it, reconsider building locally at all. Moving to a commercial cloud is a legitimate option |
-| 1 | **Memory capacity** | if the model does not fit, the entire design premise changes. Tensor parallelism has completely different conditions from a single-card setup (1-3) |
-| 2 | **Compiler and runtime support** | if CUDA and the driver have dropped that architecture, you cannot use it (Section 6) |
+| 1 | **Memory capacity** | if the model does not fit, the entire design premise changes. Tensor parallelism has completely different conditions from a single-card setup ([1-3](#1-3-tensor-parallelism-is-a-separate-problem)) |
+| 2 | **Compiler and runtime support** | if CUDA and the driver have dropped that architecture, you cannot use it ([Section 6](#6-software-stack-constraints---the-biggest-trap)) |
 | 3 | Compute throughput | considered only after the three above pass |
 
 The most common failure is starting from rank 3 and getting stopped by an earlier rank.
@@ -342,7 +342,7 @@ The table above holds **values inferred from specifications.** Measuring kernel 
 
 **The card handling encoding had only two requirements - is there VRAM for the module, and is it cheap.**
 
-Encoding is an operation that benefits from parallelism (Section 3), so **moving it from CPU to GPU is already a large gain by itself.** Measured, the P104 was 25x the CPU, and that gain does not depend on any particular compute path. Running the same shape in f16 still gives 4.34 TFLOPS, far ahead of the CPU's 290 GOPS.
+Encoding is an operation that benefits from parallelism ([Section 3](#3-let-the-nature-of-the-work-choose-the-card)), so **moving it from CPU to GPU is already a large gain by itself.** Measured, the P104 was 25x the CPU, and that gain does not depend on any particular compute path. Running the same shape in f16 still gives 4.34 TFLOPS, far ahead of the CPU's 290 GOPS.
 
 **DP4A amplified the gain; it did not decide whether there was one.** q8_0 is 2.17x faster than f16, but even f16 would have been far faster than the CPU -> [Appendix 12](98-benchmark.md#12-sm-scaling-and-kernel-path-measurements)
 
@@ -554,7 +554,7 @@ Not every case needs wide PCIe bandwidth. It depends on the nature of the work, 
 
 | Work | When traffic occurs | Cost of narrow lanes |
 |---|---|---|
-| **Tensor parallelism** (llama.cpp `--split-mode row` etc.) | all-reduce per layer, **per token** | X **high cost** (1-3) |
+| **Tensor parallelism** (llama.cpp `--split-mode row` etc.) | all-reduce per layer, **per token** | X **high cost** ([1-3](#1-3-tensor-parallelism-is-a-separate-problem)) |
 | **Multi-GPU training** (data parallel) | gradient all-reduce sized to the parameters, **per step** | X **high cost** |
 | **Weight offload / layer streaming** | weight transfer **per token** | X **high cost** - bandwidth is speed |
 | **KV cache held outside the GPU** | read and written per token | X **high cost** |
@@ -593,8 +593,8 @@ And yet **the window where that gap actually matters is extremely narrow.**
 
 ## 8. When a Heterogeneous GPU Configuration Is the Wrong Fit
 
-- **If budget is not a constraint**, much of this configuration is moot. The reason is not the electricity bill, though (7-1). The real price is **complexity and software lifespan.** Multi-architecture builds, PCIe distribution, and airflow design stay attached permanently, and the whole stack is pinned to CUDA 12.8, cut off from new optimizations and new quantization formats. If you can buy identical current-generation cards, do that instead
-- **If the model does not fit on one card and tensor parallelism is required**, the story changes entirely (1-3). Tensor parallelism across heterogeneous cards runs at the slowest card's pace and needs an NVLink-class interconnect, which drives cost up
+- **If budget is not a constraint**, much of this configuration is moot. The reason is not the electricity bill, though ([7-1](#7-1-what-goes-down-and-what-goes-up)). The real price is **complexity and software lifespan.** Multi-architecture builds, PCIe distribution, and airflow design stay attached permanently, and the whole stack is pinned to CUDA 12.8, cut off from new optimizations and new quantization formats. If you can buy identical current-generation cards, do that instead
+- **If the model does not fit on one card and tensor parallelism is required**, the story changes entirely ([1-3](#1-3-tensor-parallelism-is-a-separate-problem)). Tensor parallelism across heterogeneous cards runs at the slowest card's pace and needs an NVLink-class interconnect, which drives cost up
 - **If you cannot or will not modify the inference engine**, module separation is impossible (see [No.2 Encoder Separation](02-encoder-separation.md))
 - **If the workload does not satisfy the four conditions in 1-1**, there is no reason to split it
 - **If you lack hardware troubleshooting skill**, you will stall at diagnosing a machine that will not boot, as the [GA-X99-UD4P case in 7-2](#a-board-that-passed-the-paper-test-failed-in-the-flesh) shows. Assess your own capability honestly, and if it is not there, **starting with a consultation at a specialist shop will cut cost substantially in the end**

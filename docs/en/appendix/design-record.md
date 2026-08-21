@@ -282,4 +282,4 @@ Verifying while stacking one layer at a time keeps the failure point narrowed to
 
 **The draft design's target of "8 images in 92 seconds" was off against the actual 108.** The cause was a baseline missing the face consistency extension. **Conditions on the baseline should have been stated when setting the target, too.**
 
-And process management (3-2) had no entry in the design document at all. **"Starting and stopping things" was treated as trivial, and it became the longest-running bug in this project.**
+And process management ([3-2](#3-2-this-is-where-the-most-time-was-lost)) had no entry in the design document at all. **"Starting and stopping things" was treated as trivial, and it became the longest-running bug in this project.**
