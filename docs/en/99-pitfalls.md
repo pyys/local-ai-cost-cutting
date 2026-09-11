@@ -28,6 +28,7 @@ Appendices: [Build Log](appendix/build-log.md) / [Design Record](appendix/design
    - [Do not choose the cheap card first](#do-not-choose-the-cheap-card-first)
    - [Do not disable SMT just because the work is compute-bound](#do-not-disable-smt-just-because-the-work-is-compute-bound)
    - [Buying the hardware does not mean you are using the feature](#buying-the-hardware-does-not-mean-you-are-using-the-feature)
+   - [Tensor parallelism falls back silently without NCCL](#tensor-parallelism-falls-back-silently-without-nccl)
 8. [CPU-Bound Work Contaminates GPU Measurements](#8-cpu-bound-work-contaminates-gpu-measurements)
 9. [When You Hand Work to an AI Coding Tool](#9-when-you-hand-work-to-an-ai-coding-tool)
 
@@ -245,9 +246,17 @@ Before the rebuild, this project **bought an NVLink board and ran two V100 32GB 
 
 A multi-GPU load command was written, but `--split-mode row` was missing, and llama.cpp defaults to layer splitting, so **even with two cards visible it never ran tensor parallel.** This was only confirmed much later.
 
+> **The `--split-mode row` above is a record of what was used at the time.** That value was later removed from llama.cpp's CUDA backend; tensor parallelism today is **`--split-mode tensor`.** Putting `row` in on the strength of this document will not work.
+
 **Whether a feature is on must be verified from launch arguments and logs, not from specifications.** Having the hardware and actually using its bandwidth are separate things -> [Appendix - Build Log, Notes and Caveats 1)](appendix/build-log.md#notes-and-caveats)
 
 > The same grain as the kernel path problem in [No.1 5-2](01-role-assignment.md#5-2-a-kernel-path-cannot-be-settled-by-timing). **Which path was actually selected is knowable only by checking.**
+
+### Tensor Parallelism Falls Back Silently Without NCCL
+
+**Build llama.cpp without NCCL and tensor parallelism across three or more cards falls back with nothing but a warning.** It does not fail; it just runs slower. NCCL does not ship with the CUDA toolkit and must be installed separately, yet the build option defaults to on - which makes it easy to end up **thinking the feature is enabled when it is not.**
+
+**It is the same trap as the previous item** - what matters is not whether the flag was passed but whether the run actually took that path, and the log is where you check -> [layer-tensor-parallel-bench](https://github.com/pyys/layer-tensor-parallel-bench)
 
 ---
 

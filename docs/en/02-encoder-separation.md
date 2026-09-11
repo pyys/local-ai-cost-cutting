@@ -62,7 +62,7 @@ Unquantized at fp16, the components including the worker come to about 35GB, whi
 
 Fortunately FLUX D, unlike an LLM, **loses little performance when its constituent modules are separated, and the requirements for separating them are comparatively forgiving.**
 
-> Splitting a single module further across several GPUs is far harder and needs a strong interconnect such as NVLink. This project does not cover it -> [No.1 1-3](01-role-assignment.md#1-3-tensor-parallelism-is-a-separate-problem)
+> Splitting a single module further across several GPUs is **generally inefficient without a strong interconnect.** Image generation and conversational LLMs are structurally very different, so **benchmark results obtained on a conversational LLM do not carry over to an image generation model as they stand.** This project does not cover it -> [No.1 1-3](01-role-assignment.md#1-3-tensor-parallelism-is-a-separate-problem)
 
 **Module separation's primary contribution is not speed but lowering the minimum VRAM requirement.**
 

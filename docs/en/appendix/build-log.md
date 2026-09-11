@@ -550,4 +550,6 @@ llama-server -m <model> --mmproj <projector> -ngl 99 -c 131072 --host 0.0.0.0 --
 
 > **Having NVLink hardware and actually using its bandwidth are separate things.** This project bought an NVLink board, ran it for a month, and **never once used the link.** Giving up the NVLink cost at rebuild time was fine as one direction for the solution, but **had tensor parallelism been experienced at that stage and proven decisive, a different direction might well have been chosen** -> [No.1 1-3](../01-role-assignment.md#1-3-tensor-parallelism-is-a-separate-problem)
 
+> Related benchmarks were encountered online afterwards, and **an informal check indicated that tensor parallelism does deliver a performance gain. It reaffirmed the need for sound benchmark design and verification.**
+
 **2)** Backups save time cost in almost every case. The storage cost and the tooling cost of backing up are almost always cheaper than the labor cost when something goes wrong.

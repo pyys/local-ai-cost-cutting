@@ -55,7 +55,7 @@ Without the first, **the technique cannot be applied at all**; without the secon
 
 **The first effect visible once condition 1 holds is that the maximum VRAM any single card must carry comes down.** Whether the model loads at all is decided by condition 1, and at the initial costing stage that is the largest single change. Here, a Q8 diffusion model loaded whole needed 19.1GB; after separation it became a 13.6GB worker plus a 5.2GB encoder, and **each piece fits on a cheaper card.** That is why a 16GB + 8GB pairing replaced a single 32GB card.
 
-Conversely, **an LLM inference model fails conditions 2, 3, and 4, so there was no reason to apply it.** An LLM can be split across cards, but inter-layer traffic is large, every layer is used equally on every token, and the resource demands are identical throughout.
+Conversely, **an LLM inference model fails conditions 2, 3, and 4, so there was no reason to apply it.** An LLM can be split across cards, but splitting inside a layer (tensor parallelism) carries heavy traffic, every layer is used equally on every token, and the resource demands are identical throughout.
 
 ### 1-2. Type B - Several Models Run Concurrently (Especially with Different Resource Profiles)
 
@@ -84,11 +84,23 @@ The encoder's arithmetic intensity was then estimated, and while searching for a
 
 In the same vein, putting a draft model for speculative decoding on a separate card to raise LLM tokens per second is also Type B. The main model and the draft model differ in size and in resource demand, so different cards may be optimal for each.
 
+> **Speculative decoding is not always a win, however.** The gain depends on the character of the cards. In a later measurement, a four-card P104-100 configuration was **16-17% slower** with built-in MTP enabled - processing a 4-token draft as one batch cost 2.25-2.42x a single token, and the acceptance rate fell short of the break-even point -> [layer-tensor-parallel-bench](https://github.com/pyys/layer-tensor-parallel-bench)
+
 ### 1-3. Tensor Parallelism Is a Separate Problem
 
 Tensor parallelism - binding several GPUs' VRAM into what behaves as one - is a useful technique, but **its premises differ from what this document covers, so it is excluded from the discussion.** Tensor parallelism splits **the layers themselves** rather than modules, and so fails condition 2.
 
-Only the reason the premises differ is worth noting here. Tensor parallelism splits layers so the cards exchange results at every step, making it **transfer-bound**; consequently (a) overall speed is set by the slowest card and (b) an NVLink-class interconnect is required, which changes the cost structure. **The more heterogeneous the cards, the worse it gets** - the opposite direction from this document's approach of giving each card an independent role.
+Only the reason the premises differ is worth noting here. Tensor parallelism splits layers so the cards exchange results at every step, so **transfer is usually the bottleneck**, and interconnects such as NVLink exist to compensate for that. **When the bottleneck sits elsewhere, however, the picture can change.** And the technique generally **gets worse the more heterogeneous the cards are** - the opposite direction from this document's approach of giving each card an independent role.
+
+**Prefill and decode place very different demands on the interconnect.** Tensor parallelism's all-reduce **scales with batch size.** On a 27B-class model, decode (batch 1) moves about 1.3MB per token, while prefill moves roughly 670MB per 512-token batch. A layer split, by contrast, passes only boundary activations, so both phases stay small (about 30KB per token).
+
+**Real workloads are dominated by prefill.** In an [analysis of 90 days of OpenRouter traces](https://arxiv.org/pdf/2511.07426), the median completion-to-prompt token ratio is **0.111** - prompts are about 9x larger - and [another production trace analysis](https://arxiv.org/pdf/2607.02043) puts the median prompt-to-completion ratio at **69.7**. Chat averages around 4x, but long-prompt segments and programming workloads stretch to tens of times or more.
+
+**That is why the conventional wisdom holds - on a constrained interconnect, a layer split is the safer choice.** Most workloads are dominated by long prefills, and in that phase tensor parallelism moves far more data than a layer split does.
+
+**The exception is the decode phase of conversational work where the prompt cache hits, with a single user.** When the preceding conversation is still cached, each turn has only a few hundred new tokens to prefill, so decode takes most of the wall clock; and with a batch of 1, tensor parallelism's traffic stays small. Under those conditions the result can invert.
+
+> **This project is that exception.** The author designed the system for a **conversational, spoken-register service** from the outset, and the follow-up benchmark was designed on that same premise. The measurements linked below therefore **do not transfer directly to workloads that do not share it** -> [layer-tensor-parallel-bench](https://github.com/pyys/layer-tensor-parallel-bench)
 
 **Before the rebuild, this project ran a two-card V100 32GB NVLink configuration for a month.** At rebuild time that cost was given up.
 
@@ -552,17 +564,21 @@ Not every case needs wide PCIe bandwidth. It depends on the nature of the work, 
 
 **There is a single test - is the traffic "one-time" or "every step / every token."** Loading a model, however many GB, happens once at startup, so narrow lanes add little; traffic that occurs every step makes bandwidth the throughput ceiling directly.
 
-| Work | When traffic occurs | Cost of narrow lanes |
-|---|---|---|
-| **Tensor parallelism** (llama.cpp `--split-mode row` etc.) | all-reduce per layer, **per token** | X **high cost** ([1-3](#1-3-tensor-parallelism-is-a-separate-problem)) |
-| **Multi-GPU training** (data parallel) | gradient all-reduce sized to the parameters, **per step** | X **high cost** |
-| **Weight offload / layer streaming** | weight transfer **per token** | X **high cost** - bandwidth is speed |
-| **KV cache held outside the GPU** | read and written per token | X **high cost** |
-| **MoE experts scattered across cards** | routing per token | X **high cost** |
-| Pipeline parallel / layer split (`--split-mode layer`) | boundary activations only, per step | ~ medium cost - traffic is small enough to usually tolerate |
-| Large per-request I/O (high resolution, video) | hundreds of MB per request | ~ medium cost - judge against the transfer volume |
-| Swapping models or LoRAs per request | GB-scale loads per request | ~ medium cost - the case where it stops being one-time |
-| **Resident modules** (this project's encoder and VAE) | once at startup + a few MB per request | O **low cost** |
+| Work | When traffic occurs | Volume (27B Q6 equivalent) | Cost of narrow lanes |
+|---|---|---|---|
+| **Tensor parallelism** (llama.cpp `--split-mode tensor` etc.) | all-reduce per layer, **per token** | decode **1.3MB/token**, prefill ~**670MB** per 512-token batch | X **high cost** ([1-3](#1-3-tensor-parallelism-is-a-separate-problem)) |
+| **Multi-GPU training** (data parallel) | gradient all-reduce sized to the parameters, **per step** | **54.6GB/step** | X **high cost** |
+| **Weight offload / layer streaming** | weight transfer **per token** | **21GB/token** | X **high cost** - bandwidth is speed |
+| **KV cache held outside the GPU** | read and written per token | **5.9GB/token** (90k context) | X **high cost** |
+| **MoE experts scattered across cards** | routing per token (all-to-all) | **not measured** - depends on the configuration | X **high cost** |
+| Pipeline parallel / layer split (`--split-mode layer`) | boundary activations only, per step | **30KB/token** | ~ medium cost - traffic is small enough to usually tolerate |
+| Large per-request I/O (high resolution, video) | hundreds of MB per request | hundreds of MB/request | ~ medium cost - judge against the transfer volume |
+| Swapping models or LoRAs per request | GB-scale loads per request | GB/request | ~ medium cost - the case where it stops being one-time |
+| **Resident modules** (this project's encoder and VAE) | once at startup + a few MB per request | **4.2MB/request** | O **low cost** |
+
+> **Volumes are converted for 27B Q6, four cards, 90k context.** Note that the `X high cost` group **spans four orders of magnitude.** Tensor parallelism is the smallest of them, and in a batch-1 phase such as decode the traffic may not be the bottleneck at all -> [layer-tensor-parallel-bench](https://github.com/pyys/layer-tensor-parallel-bench)
+
+> **The MoE row is not measured.** This project's models are dense, so there was no way to measure it directly. The volume varies widely with the expert-parallel degree, the number of experts activated per token (top-k), and the model dimension. For the formulas and measurements see [DeepSpeed-MoE](https://arxiv.org/pdf/2201.05596) and [Speculative MoE](https://arxiv.org/pdf/2503.04398).
 
 **"High cost" here does not mean it will not work.** It runs on narrow lanes too; what grows is time. The upper entries simply grow it enough to make the work pointless, which removes them from consideration in practice.
 
@@ -594,7 +610,7 @@ And yet **the window where that gap actually matters is extremely narrow.**
 ## 8. When a Heterogeneous GPU Configuration Is the Wrong Fit
 
 - **If budget is not a constraint**, much of this configuration is moot. The reason is not the electricity bill, though ([7-1](#7-1-what-goes-down-and-what-goes-up)). The real price is **complexity and software lifespan.** Multi-architecture builds, PCIe distribution, and airflow design stay attached permanently, and the whole stack is pinned to CUDA 12.8, cut off from new optimizations and new quantization formats. If you can buy identical current-generation cards, do that instead
-- **If the model does not fit on one card and tensor parallelism is required**, the story changes entirely ([1-3](#1-3-tensor-parallelism-is-a-separate-problem)). Tensor parallelism across heterogeneous cards runs at the slowest card's pace and needs an NVLink-class interconnect, which drives cost up
+- **If the model does not fit on one card and layer or tensor parallelism is required**, the story changes entirely ([1-3](#1-3-tensor-parallelism-is-a-separate-problem))
 - **If you cannot or will not modify the inference engine**, module separation is impossible (see [No.2 Encoder Separation](02-encoder-separation.md))
 - **If the workload does not satisfy the four conditions in 1-1**, there is no reason to split it
 - **If you lack hardware troubleshooting skill**, you will stall at diagnosing a machine that will not boot, as the [GA-X99-UD4P case in 7-2](#a-board-that-passed-the-paper-test-failed-in-the-flesh) shows. Assess your own capability honestly, and if it is not there, **starting with a consultation at a specialist shop will cut cost substantially in the end**
