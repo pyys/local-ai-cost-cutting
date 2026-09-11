@@ -116,7 +116,7 @@ OS       Ubuntu 24.04 / CUDA 12.8        <- version pinning is an operating prin
 ## When This Approach Does Not Apply
 
 - **If budget is not a constraint**, this only adds complexity. The real price is not the electricity bill but **management complexity and software lifespan**. The moment you use previous-generation cards, the entire stack is pinned to a specific CUDA version
-- **If the model does not fit on one card and tensor parallelism is required**, the premises change completely. Tensor parallelism across heterogeneous cards runs at the speed of the slowest card (though the "demands an NVLink-class interconnect" part later turned out to be **overstated for decode** -> [separate repository](https://github.com/pyys/layer-tensor-parallel-bench))
+- **If the model does not fit on one card and tensor parallelism is required**, the premises change completely. Tensor parallelism across heterogeneous cards runs at the speed of the slowest card and demands an NVLink-class interconnect
 - **If you cannot or will not modify the inference engine**, No.2 is off the table
 - **If you lack hardware troubleshooting skill**, you will stall at diagnosing a machine that will not even POST. Judge this honestly: if you do not have that skill, **hiring a system integrator may well be the more efficient outcome**
 
@@ -138,7 +138,6 @@ And one piece of advice in the opposite direction - **there is usually some plac
 | **Avoiding the same mistakes** | [Pitfalls](docs/en/99-pitfalls.md) |
 | **Building the same machine** | [Appendix - Build Log](docs/en/appendix/build-log.md) |
 | **Working out what order to do things in** | [Appendix - Design Record](docs/en/appendix/design-record.md) |
-| **Splitting a model across cards because it will not fit on one** | [layer-tensor-parallel-bench](https://github.com/pyys/layer-tensor-parallel-bench) (separate repository) |
 
 ---
 

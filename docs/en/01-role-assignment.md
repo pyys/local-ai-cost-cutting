@@ -94,24 +94,6 @@ Only the reason the premises differ is worth noting here. Tensor parallelism spl
 
 > **That history cannot be used as evidence about tensor parallelism, however.** The two cards were split by role - LLM on GPU0, image generation on GPU1 - and the command lacked `--split-mode row`, so it **only ever did layer splitting.** In other words **the NVLink link was never actually used.** Had tensor parallelism been tried at that stage and proven decisive, a different direction might well have been chosen -> [Appendix - Build Log, Notes and Caveats 1)](appendix/build-log.md#notes-and-caveats)
 
-#### Follow-up measurement (2026-09) - parts of the above overstated the case
-
-It was eventually measured. On **four P104-100 cards over PCIe Gen1 x4 (~1 GB/s) with
-no NVLink**, tensor parallelism generated tokens **2.3x faster** than layer splitting.
-
-| Claim made above | What the measurement showed |
-|---|---|
-| "An NVLink-class interconnect is required" | **Overstated, at least for decode.** It won on one of the slowest interconnects available |
-| "It is transfer-bound" | **Depends on batch size.** Decode (batch 1) moves ~1.3 MB per token and hides it; prefill (batch 512) exposes it |
-| "Overall speed is set by the slowest card" | **Untested.** The measurement used four identical cards |
-| "The more heterogeneous the cards, the worse it gets" | **Untested**, for the same reason |
-
-So this document's **conclusion - give each card an independent role - still holds, but
-the reasoning that "the interconnect is the bottleneck" does not hold for decode.**
-The claims about heterogeneous cards remain unverified either way.
-
-Full measurements and methodology: **[layer-tensor-parallel-bench](https://github.com/pyys/layer-tensor-parallel-bench)**
-
 ---
 
 ## 2. Priority Order for Choosing GPUs
